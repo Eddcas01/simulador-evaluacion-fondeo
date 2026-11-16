@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C3 15s · LucidFlex 25K: evaluación, fondeo y cobros (2, 3 y 4 micros)</title>
+<style>
+.viz-root{color-scheme:light;--surface-0:#f4f3ef;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7974;--grid:#e1e0d9;--border:rgba(11,11,11,.10);--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--ref:#a3a29b;--good:#0ca30c;--crit:#d03b3b}
+@media (prefers-color-scheme:dark){.viz-root{color-scheme:dark;--surface-0:#111110;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;--s3:#199e70;--ref:#6b6a64}}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.viz-root{background:var(--surface-0);color:var(--text-primary);min-height:100vh;padding:28px 20px 60px}
+.wrap{max-width:1100px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
+h2{font-size:16px;margin:0 0 2px}
+.sub{color:var(--text-secondary);margin:0 0 20px}
+.note{color:var(--text-secondary);font-size:13px;margin:4px 0 12px}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:18px 18px 14px;margin:0 0 16px}
+.cols{display:grid;grid-template-columns:1fr;gap:0}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.tile .k{color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.tile .v{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums}
+.tile .h{color:var(--text-muted);font-size:12px}
+.tag{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;vertical-align:0}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary);margin:6px 0 4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{fill:var(--text-muted);font-size:11px;font-variant-numeric:tabular-nums}
+.gl{stroke:var(--grid);stroke-width:1}
+.tip{position:fixed;pointer-events:none;background:var(--surface-1);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.18);display:none;z-index:9;max-width:300px}
+.tip .t{color:var(--text-secondary);font-size:11px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--grid);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--text-secondary);font-weight:600}
+.ok{color:var(--good)}.ko{color:var(--crit)}
+ul.note{padding-left:18px}
+details summary{cursor:pointer;color:var(--text-secondary)}
+.scroll{max-height:420px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="viz-root"><div class="wrap">
+<h1>Bot C3 15s en LucidFlex 25K: ¿cuántas cuentas pasan, cuántas cobran?</h1>
+<p class="sub" id="sub"></p>
+
+<div class="cols" id="cfgcards"></div>
+
+<div class="card">
+<h2>El embudo: de evaluación comprada a cobro</h2>
+<p class="note">Una evaluación a la vez; cada aprobada abre una cuenta fondeada que opera en paralelo con las mismas señales.</p>
+<div class="legend" id="lg_funnel"></div>
+<div id="c_funnel"></div>
+</div>
+
+<div class="card">
+<h2>Lo que te queda en el bolsillo, acumulado mes a mes</h2>
+<p class="note">Cobros (90 % para ti) menos cuotas de evaluación y resets. Pasa el cursor para ver cada mes.</p>
+<div class="legend" id="lg_prog"></div>
+<div id="c_prog"></div>
+</div>
+
+<div class="card">
+<h2>¿Hay edge real? El backtest en bruto, sin reglas de la firma</h2>
+<p class="note" id="edgetxt"></p>
+<table id="t_edge"></table>
+</div>
+
+<div class="card">
+<h2>Largo plazo: resultado por trimestre</h2>
+<p class="note">Una curva que solo sube en un trimestre no es lo mismo que una que sube en todos.</p>
+<div class="legend" id="lg_q"></div>
+<div id="c_q"></div>
+</div>
+
+<div class="card">
+<h2>Curva de capital del backtest (una sola cuenta, sin reglas)</h2>
+<div class="legend" id="lg_eq"></div>
+<div id="c_eq"></div>
+</div>
+
+<div class="card">
+<h2>Sensibilidad</h2>
+<table id="t_sens"></table>
+<p class="note">“Comisión real” suma $0.74 ida y vuelta por micro a lo que cobró el backtest ($1). “Pedir desde $500” cobra en cuanto se puede en lugar de esperar a que el 50 % de la ganancia llegue a $1,000.</p>
+</div>
+
+<div class="card">
+<h2>Supuestos</h2>
+<ul class="note">
+<li><b>Evaluación:</b> objetivo +$1,250, pérdida máx. $1,000 con drawdown EOD (revisado intradía con el MAE), consistencia 40 %, sin límite diario. Cuota $60.20 por cuenta nueva y $60 por reset.</li>
+<li><b>Fondeada:</b> pérdida máx. $1,000 EOD; el piso deja de subir en $25,100. Mientras no llega ahí, aplica el DLL de $600: si el día pierde $600 se cierra la posición en −$600 y no se opera más ese día (no quema la cuenta). Activación gratis.</li>
+<li><b>Cobro:</b> 5 días con al menos +$100 y ganancia neta positiva en el ciclo. Se pide al cierre del día el 50 % de la ganancia, como máximo $1,000; el escenario base espera a poder pedir los $1,000 completos. Te llevas el 90 %. Tras 5 cobros la cuenta pasa a live y sale del conteo.</li>
+<li>No se modelan el plan de escalado, el límite de cuentas simultáneas de la firma ni el deslizamiento. Revisa en Lucid si el DLL de la fondeada es “soft” (cierra el día) como aquí, o si quema la cuenta.</li>
+</ul>
+</div>
+
+<div class="card"><details><summary>Detalle de cada cuenta fondeada</summary><div class="scroll"><table id="t_f"></table></div></details></div>
+
+</div></div>
+<div class="tip" id="tip"></div>
+<script>
+const D=/*DATA*/null;
+const $=id=>document.getElementById(id);
+const fm=v=>(v<0?'−$':'$')+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:(v%1?2:0),maximumFractionDigits:2});
+const pct=v=>(v*100).toFixed(1)+' %';
+const tip=$('tip');
+function showTip(e,h){tip.innerHTML=h;tip.style.display='block';const w=tip.offsetWidth,x=e.clientX+14;tip.style.left=(x+w>innerWidth?e.clientX-w-14:x)+'px';tip.style.top=(e.clientY+14)+'px'}
+function hideTip(){tip.style.display='none'}
+const NS='http://www.w3.org/2000/svg';
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function svg(host,W,H){const s=el('svg',{viewBox:`0 0 ${W} ${H}`,role:'img'});$(host).appendChild(s);return s}
+function nice(span,n=5){const raw=span/n,p=Math.pow(10,Math.floor(Math.log10(raw))),m=raw/p;return (m>5?10:m>2?5:m>1?2:1)*p}
+function yAxis(s,x0,x1,y,lo,hi,fmt){const st=nice(hi-lo);for(let v=Math.ceil(lo/st)*st;v<=hi+1e-9;v+=st){const yy=y(v);el('line',{x1:x0,x2:x1,y1:yy,y2:yy,class:'gl'},s);el('text',{x:x0-6,y:yy+4,'text-anchor':'end'},s).textContent=fmt(Math.abs(v)<1e-9?0:v)}}
+const css=v=>getComputedStyle(document.querySelector('.viz-root')).getPropertyValue(v).trim();
+const LABS=Object.keys(D);
+const COL={'2MNQ':'--s1','3MNQ':'--s2','4MNQ':'--s3','5MNQ':'--ref'};
+const NAME={'2MNQ':'2 micros','3MNQ':'3 micros','4MNQ':'4 micros','5MNQ':'5 micros (referencia)'};
+const MAIN=['2MNQ','3MNQ','4MNQ'].filter(k=>D[k]);
+const legend=(id,keys)=>$(id).innerHTML=keys.map(k=>`<span><i style="background:var(${COL[k]})"></i>${NAME[k]}</span>`).join('');
+const e0=D[MAIN[0]].edge;
+$('sub').textContent=`Mismo bot y mismas señales, backtest ${D[MAIN[0]].eq[0].d} → ${D[MAIN[0]].eq.at(-1).d}. TP ≈ +$258 y salida en contra ≈ −$1,000 por trade en ambas versiones; cambia el tamaño en puntos.`;
+
+// config cards
+$('cfgcards').innerHTML=MAIN.map(k=>{const b=D[k].base,r=D[k].roll;return `<div class="card"><h2><span class="tag" style="background:var(${COL[k]})"></span>${NAME[k]}</h2>
+<div class="tiles">
+<div class="tile"><div class="k">Pasan la evaluación</div><div class="v">${b.passed}</div><div class="h">de ${b.evals} compradas</div></div>
+<div class="tile"><div class="k">Cobran algo</div><div class="v">${b.got_pay}</div><div class="h">de ${b.funded} fondeadas</div></div>
+<div class="tile"><div class="k">Llegan al 1er cobro de $1,000</div><div class="v">${b.first1000}</div><div class="h">${b.npays} cobros en total</div></div>
+<div class="tile"><div class="k">Neto para ti</div><div class="v" style="color:var(${b.net>=0?'--good':'--crit'})">${fm(Math.round(b.net))}</div><div class="h">${fm(b.trader)} cobrado − ${fm(b.fees)} cuotas</div></div>
+</div><p class="note" style="margin-top:10px">Arrancando una cuenta en cualquier día: ${pct(r.p/r.n)} aprueba y ${pct(r.pay/r.n)} llega a cobrar $1,000 con esa misma cuenta (${r.pay} de ${r.n}). Máximo de fondeadas abiertas a la vez: ${b.conc}.</p></div>`}).join('');
+
+// funnel (grouped horizontal bars)
+(()=>{const keys=LABS;legend('lg_funnel',keys);
+const steps=[['Evaluaciones compradas',k=>D[k].base.evals],['Aprobadas (fondeadas)',k=>D[k].base.passed],['Cobran al menos una vez',k=>D[k].base.got_pay],['Llegan al 1er cobro de $1,000',k=>D[k].base.first1000],['Llegan al 2º cobro',k=>D[k].base.paydist.filter(x=>x>=2).length],['Llegan al 3er cobro',k=>D[k].base.paydist.filter(x=>x>=3).length]];
+const W=1060,L=210,R=60,bh=12,gap=2,grp=keys.length*(bh+gap)+16,T=6,H=T+steps.length*grp;const s=svg('c_funnel',W,H);
+const mx=Math.max(...keys.map(k=>D[k].base.evals));const x=v=>L+(W-L-R)*v/mx;
+steps.forEach(([lab,f],i)=>{const y0=T+i*grp;const t=el('text',{x:0,y:y0+(keys.length*(bh+gap))/2+4},s);t.textContent=lab;t.style.fill=css('--text-secondary');t.style.fontSize='12px';
+keys.forEach((k,j)=>{const v=f(k),y=y0+j*(bh+gap),w=Math.max(x(v)-L,v?3:0);
+el('path',{d:`M${L},${y}h${Math.max(w-3,0)}q3,0 3,3v${bh-6}q0,3 -3,3h${-Math.max(w-3,0)}Z`,fill:css(COL[k])},s);
+const tt=el('text',{x:L+w+6,y:y+bh-2},s);tt.textContent=v;tt.style.fill=css('--text-primary');
+const h=el('rect',{x:L,y,width:W-L-R,height:bh,fill:'transparent'},s);h.addEventListener('mousemove',e=>showTip(e,`<b>${NAME[k]}</b><div>${lab}: <b>${v}</b></div>`));h.addEventListener('mouseleave',hideTip)})})})();
+
+// cumulative program net (line chart, months)
+function lineChart(host,keys,get,xs,fmt,H=260,zero=true){const W=1060,L=64,R=110,T=12,B=26;const s=svg(host,W,H);
+const all=keys.flatMap(k=>get(k));let lo=Math.min(0,...all),hi=Math.max(0,...all);const pad=(hi-lo)*.06;lo-=pad;hi+=pad;
+const n=xs.length;const x=i=>L+(W-L-R)*i/(n-1),y=v=>T+(H-T-B)*(hi-v)/(hi-lo);yAxis(s,L,W-R,y,lo,hi,fmt);
+if(zero)el('line',{x1:L,x2:W-R,y1:y(0),y2:y(0),stroke:css('--text-muted'),'stroke-width':1},s);
+const ends=[];keys.forEach(k=>{const v=get(k);el('path',{d:v.map((q,i)=>(i?'L':'M')+x(i)+','+y(q)).join(''),fill:'none',stroke:css(COL[k]),'stroke-width':2,'stroke-linejoin':'round'},s);ends.push([y(v[n-1]),k,v[n-1]])});
+ends.sort((a,b)=>a[0]-b[0]);let last=-1e9;ends.forEach(([yy,k,v])=>{yy=Math.max(yy,last+14);last=yy;const t=el('text',{x:x(n-1)+6,y:yy+4},s);t.textContent=fmt(v);t.style.fill=css('--text-primary')});
+const step=Math.max(1,Math.ceil(n/8));xs.forEach((d,i)=>{if(i%step===0||i===n-1)el('text',{x:x(i),y:H-8,'text-anchor':'middle'},s).textContent=d});
+const cl=el('line',{y1:T,y2:H-B,stroke:css('--text-muted'),visibility:'hidden'},s);const hit=el('rect',{x:L,y:T,width:W-L-R,height:H-T-B,fill:'transparent'},s);
+hit.addEventListener('mousemove',e=>{const r=s.getBoundingClientRect();const i=Math.max(0,Math.min(n-1,Math.round(((e.clientX-r.left)*W/r.width-L)/(W-L-R)*(n-1))));cl.setAttribute('x1',x(i));cl.setAttribute('x2',x(i));cl.setAttribute('visibility','visible');
+showTip(e,`<b>${xs[i]}</b>`+keys.map(k=>`<div><span class="tag" style="background:var(${COL[k]})"></span>${NAME[k]}: <b>${fmt(get(k)[i])}</b></div>`).join(''))});hit.addEventListener('mouseleave',()=>{hideTip();cl.setAttribute('visibility','hidden')})}
+legend('lg_prog',LABS);
+lineChart('c_prog',LABS,k=>D[k].prog.map(p=>p.v),D[LABS[0]].prog.map(p=>p.m),v=>fm(Math.round(v)));
+
+// edge table
+const E=k=>D[k].edge;
+$('edgetxt').innerHTML=`El “% necesario” es el porcentaje de aciertos con el que un trade que gana ≈$258 y pierde ≈$1,000 queda en cero. Superarlo con margen y en ambos lados (compras y ventas) es lo que separa un edge de la simple subida del Nasdaq en el periodo (de ${e0.first_price.toLocaleString("en-US")} a ${e0.last_price.toLocaleString("en-US")} puntos). Intervalos de confianza al 95 % remuestreando por días.`;
+$('t_edge').innerHTML='<tr><th>Métrica</th>'+LABS.map(k=>`<th><span class="tag" style="background:var(${COL[k]})"></span>${NAME[k]}</th>`).join('')+'</tr>'+[
+['Trades',k=>E(k).n],
+['Aciertos TP vs SL',k=>pct(E(k).race)],
+['% necesario para quedar en cero',k=>pct(E(k).p0)],
+['Ventaja sobre el azar (z)',k=>`<span class="${E(k).z>=2?'ok':''}">${E(k).z.toFixed(1)}</span>`],
+['Cierres al final de la sesión',k=>`${E(k).oth} trades, ${fm(E(k).oth_net)}`],
+['Neto total',k=>fm(E(k).net)],
+['Neto por trade',k=>fm(E(k).exp)],
+['IC 95 % neto por trade',k=>`<span class="${E(k).ci_n[0]>0?'ok':''}">${fm(E(k).ci_n[0])} a ${fm(E(k).ci_n[1])}</span>`],
+['Neto por trade con comisión real',k=>fm(D[k].edge_real.exp)],
+['Profit factor',k=>E(k).pf.toFixed(2)],
+['Compras: neto (aciertos)',k=>`${fm(E(k).long.net)} (${pct(E(k).long.race)})`],
+['Ventas: neto (aciertos)',k=>`${fm(E(k).short.net)} (${pct(E(k).short.race)})`],
+['Meses positivos',k=>`${E(k).pos_months} de ${E(k).n_months}`],
+['Trimestres positivos',k=>`${E(k).quarters.filter(q=>q.v>0).length} de ${E(k).quarters.length}`],
+['Caída máxima',k=>fm(E(k).mdd)]].map(([l,f])=>`<tr><td>${l}</td>${LABS.map(k=>`<td>${f(k)}</td>`).join('')}</tr>`).join('');
+
+// quarterly grouped bars
+(()=>{legend('lg_q',LABS);const qs=E(LABS[0]).quarters.map(q=>q.q);const W=1060,H=260,L=64,R=8,T=12,B=26;const s=svg('c_q',W,H);
+const vals=LABS.flatMap(k=>E(k).quarters.map(q=>q.v));let lo=Math.min(0,...vals),hi=Math.max(0,...vals);const pad=(hi-lo)*.06;lo-=pad;hi+=pad;
+const y=v=>T+(H-T-B)*(hi-v)/(hi-lo);yAxis(s,L,W-R,y,lo,hi,v=>fm(v));const gw=(W-L-R)/qs.length,bw=Math.min(36,(gw-20)/LABS.length-2);
+qs.forEach((q,i)=>{const cx=L+gw*(i+.5),x0=cx-(LABS.length*(bw+2))/2;LABS.forEach((k,j)=>{const v=(E(k).quarters.find(z=>z.q===q)||{v:0}).v,xx=x0+j*(bw+2);
+const top=Math.min(y(v),y(0)),h=Math.abs(y(v)-y(0));el('rect',{x:xx,y:top,width:bw,height:Math.max(h,1),rx:2,fill:css(COL[k])},s);
+const hit=el('rect',{x:xx-1,y:T,width:bw+2,height:H-T-B,fill:'transparent'},s);hit.addEventListener('mousemove',e=>showTip(e,`<b>${q}</b><div>${NAME[k]}: <b>${fm(v)}</b></div>`));hit.addEventListener('mouseleave',hideTip)});
+el('text',{x:cx,y:H-8,'text-anchor':'middle'},s).textContent=q});el('line',{x1:L,x2:W-R,y1:y(0),y2:y(0),stroke:css('--text-muted')},s)})();
+
+// equity
+(()=>{legend('lg_eq',LABS);const days=D[LABS[0]].eq.map(p=>p.d);const maps=Object.fromEntries(LABS.map(k=>{const m={};D[k].eq.forEach(p=>m[p.d]=p.v);let last=0;return [k,days.map(d=>last=(d in m?m[d]:last))]}));
+lineChart('c_eq',LABS,k=>maps[k],days,v=>fm(Math.round(v)),260)})();
+
+// sensitivity
+$('t_sens').innerHTML='<tr><th>Escenario</th>'+LABS.map(k=>`<th>${NAME[k]}</th>`).join('')+'</tr>'+[
+['Base: 1er cobro de $1,000',k=>`${D[k].base.first1000} cuentas · ${fm(Math.round(D[k].base.net))}`],
+['Pedir desde $500',k=>`${D[k].minp.got_pay} cobran · ${fm(Math.round(D[k].minp.net))}`],
+['Comisión real',k=>`${D[k].real.first1000} cuentas · ${fm(Math.round(D[k].real.net))}`],
+['Prob. de cobrar $1,000 desde cualquier día (comisión real)',k=>pct(D[k].roll.pay_real/D[k].roll.n)]].map(([l,f])=>`<tr><td>${l}</td>${LABS.map(k=>`<td>${f(k)}</td>`).join('')}</tr>`).join('');
+
+// funded detail
+$('t_f').innerHTML='<tr><th>Config</th><th>Inicio</th><th>Fin</th><th>Resultado</th><th>Cobros</th></tr>'+MAIN.flatMap(k=>D[k].base.funded_list.map(f=>`<tr><td>${NAME[k]}</td><td>${f.s}</td><td>${f.e}</td><td class="${f.r==='BLOWN'?'ko':'ok'}">${f.r==='BLOWN'?'✗ Quemada':f.r==='LIVE'?'✓ Pasa a live':'Abierta'}</td><td>${f.p.length?f.p.map(p=>p[0]+' '+fm(p[1])).join('<br>'):'—'}</td></tr>`)).join('');
+</script>
+</body>
+</html>
